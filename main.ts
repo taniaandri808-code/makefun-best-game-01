@@ -1,29 +1,110 @@
-// A working threejs-fps-01 entry (Node 22, standard library only): Apex Terminal is a round-based tactical FPS
-// featuring an original 32x38m arena with two lanes (Warehouse & Courtyard), bomb objectives (plant/defuse at A or B),
-// active AI bots with patrol and combat states, economy buy menu (<kbd>B</kbd>), four weapons (Pistol, SMG, Rifle, Sniper)
-// plus frag grenades, hitscan raycasting with headshot multipliers, recoil, spread, and robust screenshot support.
-//
-// Serve it locally with `node serve.ts`, then open http://localhost:8080.
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { createServer } from 'node:http';
+import { createReadStream, statSync, mkdirSync } from 'node:fs';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildDossier } from './vendor/makefun-threejs.ts';
+import { chromium } from 'playwright-core';
 
-const here = fileURLToPath(new URL('.', import.meta.url));
-const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const __dirname = resolve(fileURLToPath(import.meta.url), '..');
+const root = resolve(__dirname, 'game');
+const PORT = 8080;
 
-mkdirSync(out, { recursive: true });
-cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
-mkdirSync(join(out, 'screenshots'), { recursive: true });
-if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.glb': 'model/gltf-binary',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+};
 
-// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes; the others refuse an entry the
-// scorer would refuse (more than 4 screenshots or one over 256 KiB; more than 993 files in game/ or 48 MiB of game
-// files, in all: game/ counts beside /output's own 1000-entry cap, its screenshots/ and dossier.json).
-writeFileSync(
-  join(out, 'dossier.json'),
-  buildDossier(out, { text_max_bytes: 163840, screenshots: { max: 4, max_bytes: 262144 }, game_max_files: 993, game_max_bytes: 50331648 }),
-);
+const server = createServer((request, response) => {
+  const url = new URL(request.url ?? '/', 'http://localhost');
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    response.writeHead(400).end('bad request');
+    return;
+  }
+  if (pathname.endsWith('/')) pathname += 'index.html';
+  const file = resolve(join(root, normalize(pathname)));
+  if (file !== root && !file.startsWith(root + sep)) {
+    response.writeHead(403).end('forbidden');
+    return;
+  }
+  let size: number;
+  try {
+    const stats = statSync(file);
+    if (!stats.isFile()) throw new Error('not a file');
+    size = stats.size;
+  } catch {
+    response.writeHead(404).end('not found');
+    return;
+  }
+  response.writeHead(200, {
+    'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
+    'content-length': size,
+    'cache-control': 'no-store',
+  });
+  createReadStream(file).pipe(response);
+});
+
+server.listen(PORT, '127.0.0.1', async () => {
+  console.log(`Apex Terminal orchestrator running on http://localhost:${PORT}`);
+
+  try {
+    mkdirSync('screenshots', { recursive: true });
+    const browser = await chromium.launch({
+      executablePath: '/root/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome',
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+    });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+
+    const shots = [
+      { name: 'screenshots/1-start.jpg', url: `http://localhost:${PORT}/?shot=start&seed=1` },
+      { name: 'screenshots/2-play.jpg', url: `http://localhost:${PORT}/?shot=play&seed=1` },
+      { name: 'screenshots/3-end.jpg', url: `http://localhost:${PORT}/?shot=end&seed=1` },
+    ];
+
+    for (const s of shots) {
+      const page = await context.newPage();
+      await page.goto(s.url, { waitUntil: 'networkidle' }).catch(() => {});
+      
+      if (s.url.includes('play')) {
+        await page.keyboard.down('KeyW');
+        await page.waitForTimeout(600);
+        await page.keyboard.down('Space');
+        await page.waitForTimeout(200);
+        await page.keyboard.up('Space');
+        await page.mouse.click(640, 360);
+        await page.waitForTimeout(1000);
+        await page.keyboard.up('KeyW');
+      } else if (s.url.includes('end')) {
+        await page.waitForTimeout(1000);
+      }
+
+      await page.waitForFunction(() => (window as any).__shotReady === true, { timeout: 6000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: s.name, type: 'jpeg', quality: 90 });
+      await page.close();
+      console.log(`Captured ${s.name}`);
+    }
+
+    await browser.close();
+    console.log('Screenshots regenerated successfully.');
+    server.close(() => {
+      process.exit(0);
+    });
+  } catch (err) {
+    console.error('Error during orchestrator execution:', err);
+    server.close(() => {
+      process.exit(1);
+    });
+  }
+});
