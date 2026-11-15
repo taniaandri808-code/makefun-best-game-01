@@ -46,8 +46,12 @@ export function createHud() {
   const roundTimer = document.getElementById('round-timer');
   const bombStatus = document.getElementById('bomb-status');
   const hitmarker = document.getElementById('hitmarker');
+  const damagePopup = document.getElementById('damage-popup');
+  const roundBanner = document.getElementById('round-banner');
+  const killfeed = document.getElementById('killfeed');
 
   let hitTimer = 0;
+  let damageTimer = 0;
   let lastMag = -1;
   let lastReserve = -1;
   let lastScore = -1;
@@ -56,6 +60,37 @@ export function createHud() {
   let lastMoney = -1;
 
   return {
+    showDamage(amount, isHeadshot) {
+      if (!damagePopup) return;
+      damagePopup.textContent = `${amount}${isHeadshot ? ' ★' : ''}`;
+      damagePopup.style.color = isHeadshot ? 'var(--accent)' : 'var(--ink)';
+      damagePopup.classList.add('show');
+      clearTimeout(damageTimer);
+      damageTimer = setTimeout(() => {
+        damagePopup.classList.remove('show');
+      }, 250);
+    },
+    setRoundBanner(text) {
+      if (roundBanner) roundBanner.textContent = text;
+    },
+    hideRoundBanner() {
+      if (roundBanner) roundBanner.classList.add('hidden');
+    },
+    addKill(killer, weaponName, target) {
+      if (!killfeed) return;
+      const item = document.createElement('div');
+      item.className = 'killfeed-item';
+      item.innerHTML = `<b>${killer}</b> <span class="weapon">${weaponName}</span> <b>${target}</b>`;
+      killfeed.appendChild(item);
+      while (killfeed.children.length > 3) {
+        killfeed.removeChild(killfeed.firstChild);
+      }
+      setTimeout(() => {
+        item.style.transition = 'opacity 400ms';
+        item.style.opacity = '0';
+        setTimeout(() => item.remove(), 400);
+      }, 4000);
+    },
     setAmmo(mag, reserve, name) {
       if (mag === lastMag && reserve === lastReserve) return;
       lastMag = mag;

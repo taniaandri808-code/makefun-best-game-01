@@ -44,6 +44,71 @@
   #hitmarker i:nth-child(3) { top: 12px; left: 0; height: 2px; width: 8px; }
   #hitmarker i:nth-child(4) { top: 12px; right: 0; height: 2px; width: 8px; }
 
+  #damage-popup {
+    position: fixed;
+    left: 53%;
+    top: 46%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-readout);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--accent);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 180ms ease-out, opacity 180ms ease-out;
+  }
+  #damage-popup.show {
+    opacity: 1;
+    transform: translate(-50%, -62%) scale(1.15);
+  }
+
+  #round-banner {
+    position: fixed;
+    top: 84px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: color-mix(in srgb, var(--surface) 95%, transparent);
+    border: 1px solid var(--accent);
+    padding: 8px 20px;
+    border-radius: var(--radius-control);
+    font-family: var(--font-readout);
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    z-index: 50;
+    transition: opacity 400ms ease;
+  }
+  #round-banner.hidden { opacity: 0; pointer-events: none; }
+
+  #killfeed {
+    position: fixed;
+    top: 76px;
+    right: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-end;
+    font-family: var(--font-readout);
+    font-size: 12px;
+    z-index: 50;
+  }
+  .killfeed-item {
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    border: 1px solid var(--hairline);
+    padding: 4px 10px;
+    border-radius: var(--radius-panel);
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .killfeed-item b { color: var(--ink); font-weight: 500; }
+  .killfeed-item .weapon { color: var(--accent); }
+
   /* HUD Top Bar */
   #hud-top {
     position: fixed;
@@ -248,6 +313,11 @@
 <div id="hud" aria-hidden="true">
   <div id="crosshair"><i></i><i></i><i></i><i></i></div>
   <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+  <div id="damage-popup"></div>
+  <div id="round-banner">ROUND 1 — SEARCH & DESTROY</div>
+  <div id="killfeed">
+    <div class="killfeed-item"><b>OPERATOR</b> <span class="weapon">APEX-4</span> <b>BOT_ALPHA</b></div>
+  </div>
   <div id="hud-top">
     <div id="round-timer">1:45</div>
     <div id="bomb-status">Bomb: Not Planted</div>

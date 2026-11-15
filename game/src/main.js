@@ -180,12 +180,18 @@ function shoot(spread) {
   createTracer(camera.position, endPoint);
 
   if (hit && hit.object.userData.target) {
+    const isHeadshot = hit.object.userData.part === 'head';
+    const dealt = Math.round(cfg.damage * (isHeadshot ? 4 : 1));
     const killed = bots.damage(hit.object, cfg.damage);
     score += killed ? 300 : 25;
-    if (killed) body.money += 300;
+    if (killed) {
+      body.money += 300;
+      hud.addKill('OPERATOR', weapon.state.name, `BOT_${hit.object.userData.target.index + 1}`);
+    }
     hud.setScore(score);
     hud.setStats(body.health, body.armor, body.money);
     hud.hitMarker(killed, markerHoldMs);
+    hud.showDamage(dealt, isHeadshot);
 
     if (bots.remaining() === 0 && roundState !== 'END') {
       roundState = 'END';
@@ -303,6 +309,8 @@ function runShot(name) {
     shoot(0);
     settle(10);
     shoot(0);
+    hud.addKill('OPERATOR', 'APEX-4', 'BOT_ALPHA');
+    hud.showDamage(100, true);
   } else if (name === 'end') {
     roundState = 'END';
     score = 2400;
@@ -315,6 +323,7 @@ function runShot(name) {
     settle(10);
     aimAt(new THREE.Vector3(0, 1.5, -10));
     hud.showOverlay('start', 0);
+    hud.setRoundBanner('ROUND 1 — SEARCH & DESTROY');
   }
   hud.setScore(score);
   hud.setStats(body.health, body.armor, body.money);
